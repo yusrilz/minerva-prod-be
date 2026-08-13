@@ -7,11 +7,12 @@ const pemBytes = (pem: string) => Buffer.from(pem.replace(/-----[^-]+-----|\s/g,
 
 export class GoogleWaveNetAdapter implements KokoroPort {
   private token?: { value: string; expiresAt: number }
-  constructor(private readonly credentialsPath: string, private readonly voice = 'en-US-Wavenet-F', private readonly fetchImpl: typeof fetch = fetch) {}
+  constructor(private readonly credentialsJson: string, private readonly voice = 'en-US-Wavenet-F', private readonly fetchImpl: typeof fetch = fetch) {}
 
   private async accessToken() {
     if (this.token && this.token.expiresAt > Date.now() + 60_000) return this.token.value
-    const account = await Bun.file(this.credentialsPath).json() as ServiceAccount
+    if (!this.credentialsJson.trim()) throw new AiError({ message: 'GOOGLE_TTS_CREDENTIALS_JSON is not configured.', code: 'AI_CONFIGURATION_ERROR', status: 503 })
+    const account = JSON.parse(this.credentialsJson) as ServiceAccount
     if (!account.client_email || !account.private_key) throw new AiError({ message: 'Google TTS service-account credentials are incomplete.', code: 'AI_CONFIGURATION_ERROR', status: 503 })
     const now = Math.floor(Date.now() / 1000); const header = b64(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))
     const claims = b64(JSON.stringify({ iss: account.client_email, scope: 'https://www.googleapis.com/auth/cloud-platform', aud: account.token_uri || 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 }))
@@ -34,4 +35,4 @@ export class GoogleWaveNetAdapter implements KokoroPort {
   }
 }
 
-export const createGoogleWaveNetFromEnv = () => new GoogleWaveNetAdapter(process.env.GOOGLE_TTS_CREDENTIALS_PATH || '', process.env.GOOGLE_TTS_VOICE || 'en-US-Wavenet-F')
+export const createGoogleWaveNetFromEnv = () => new GoogleWaveNetAdapter(process.env.GOOGLE_TTS_CREDENTIALS_JSON || '', process.env.GOOGLE_TTS_VOICE || 'en-US-Wavenet-F')
