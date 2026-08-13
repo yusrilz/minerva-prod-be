@@ -113,15 +113,14 @@ export async function requireAuth(request: Request) {
   return session
 }
 
-function sessionCookieAttributes(maxAge: number) {
-  // this part is modified to ensure [session and cookie security by enforcing HttpOnly, Secure, and SameSite=Strict flags unconditionally]
-  const sameSite = 'Strict';
-  const secure = '; Secure';
+function sessionCookieAttributes(maxAge: number, sameSiteOverride?: string) {
+  const sameSite = sameSiteOverride ?? config.cookieSameSite
+  const secure = config.cookieSecure ? '; Secure' : ''
   return `Path=/; HttpOnly; SameSite=${sameSite}; Max-Age=${maxAge}${secure}`
 }
 
-export function authCookie(name: string, token: string, maxAge: number) {
-  return `${name}=${encodeURIComponent(token)}; ${sessionCookieAttributes(maxAge)}`
+export function authCookie(name: string, token: string, maxAge: number, sameSiteOverride?: string) {
+  return `${name}=${encodeURIComponent(token)}; ${sessionCookieAttributes(maxAge, sameSiteOverride)}`
 }
 
 export function sessionCookie(token: string, maxAge = config.sessionTtlSeconds) {

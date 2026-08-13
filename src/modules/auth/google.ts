@@ -21,7 +21,8 @@ export async function createOAuthStateToken(next: string): Promise<string> {
 }
 
 export function oauthStateCookie(state: string) {
-  return authCookie(OAUTH_STATE_COOKIE, state, OAUTH_STATE_TTL_SECONDS)
+  const sameSite = config.cookieSameSite.toLowerCase() === 'none' ? 'none' : 'lax'
+  return authCookie(OAUTH_STATE_COOKIE, state, OAUTH_STATE_TTL_SECONDS, sameSite)
 }
 
 export async function readOAuthNext(state: string): Promise<string | null> {
