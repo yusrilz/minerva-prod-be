@@ -1,0 +1,25 @@
+{
+  "name": "minerva",
+  "version": "1.0.50",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "check": "tsc --noEmit",
+    "test": "bun test",
+    "audit:security": "bun run scripts/dependency_audit.ts"
+  },
+  "dependencies": {
+    "@elysiajs/cors": "^1.4.2",
+    "elysia": "latest",
+    "mammoth": "^1.12.1",
+    "mongoose": "^8.19.1"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "bun-types": "^1.3.14",
+    "mongodb-memory-server": "^11.2.0",
+    "typescript": "^5.9.3"
+  },
+  "module": "src/index.ts",
+  "types": "src/index.ts"
+}
