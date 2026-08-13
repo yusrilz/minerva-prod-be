@@ -96,7 +96,9 @@ export const ieltsRoutes = new Elysia({ name: 'ielts-routes' })
     const exercise = await IELTSExercise.findById(params.id).select('graphUrl').lean() as Record<string, any> | null
     assertFound(exercise, 'Exercise not found')
     const source = String(exercise.graphUrl || '')
-    const fileId = source.match(/drive\.google\.com\/file\/d\/([^/?]+)/)?.[1]
+    const fileId =
+      source.match(/drive\.google\.com\/file\/d\/([^/?]+)/)?.[1] ||
+      new URL(source, 'https://drive.google.com').searchParams.get('id')
     if (!fileId) throw new AppError(404, 'IELTS_GRAPH_NOT_FOUND', 'This writing exercise does not have a usable chart image')
     let upstream: Response
     try {
