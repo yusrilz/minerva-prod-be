@@ -45,7 +45,16 @@ type RecommendationCandidate = {
   baselineMatch: number
 }
 
-const plain = (value: unknown) => value == null ? '' : String(value).trim()
+const plain = (value: unknown) => {
+  if (value == null) return ''
+  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean).join(', ')
+  return String(value).trim()
+}
+
+const asIsoDate = (value: unknown) => {
+  const date = value instanceof Date ? value : new Date(String(value || ''))
+  return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString()
+}
 
 const candidateScore = (candidate: RecommendationCandidate, profile: Record<string, unknown> | null, answers: string[]) => {
   const intake = answers.join(' ').toLowerCase()
@@ -57,10 +66,11 @@ const candidateScore = (candidate: RecommendationCandidate, profile: Record<stri
   addMatch(profile?.destinationCountry, candidate.country, 8)
   addMatch(profile?.targetEducationLevel, candidate.educationLevel, 6)
   const field = plain(profile?.fieldOfStudy).toLowerCase()
-  if (field && (candidate.fieldOfStudy.toLowerCase().includes(field) || candidate.fieldOfStudy.toLowerCase().includes('all field'))) score += 7
+  const candidateField = candidate.fieldOfStudy.toLowerCase()
+  if (field && (candidateField.includes(field) || candidateField.includes('all field'))) score += 7
   addMatch(profile?.fundingPreference, candidate.fundingType, 5)
   if (intake.includes(candidate.country.toLowerCase())) score += 9
-  if (candidate.fieldOfStudy && candidate.fieldOfStudy.toLowerCase() !== 'all fields' && intake.includes(candidate.fieldOfStudy.toLowerCase())) score += 8
+  if (candidateField && candidateField !== 'all fields' && intake.includes(candidateField)) score += 8
   if (/full(?:y)?\s+fund/.test(intake) && candidate.fundingType.toLowerCase().includes('full')) score += 7
   return score
 }
@@ -96,13 +106,13 @@ export const createRecommendationRoutes = ({ getAi }: AiRouteDependencies) =>
         UserProfile.findOne({ userId }).lean(),
       ])
       const candidates: RecommendationCandidate[] = scholarships.map((scholarship) => ({
-        id: scholarship.slug,
-        name: scholarship.name,
-        country: scholarship.country,
-        educationLevel: scholarship.educationLevel,
-        fieldOfStudy: scholarship.fieldOfStudy,
-        fundingType: scholarship.fundingType,
-        deadline: scholarship.deadline.toISOString(),
+        id: String(scholarship._id),
+        name: plain(scholarship.name),
+        country: plain(scholarship.country),
+        educationLevel: plain(scholarship.educationLevel),
+        fieldOfStudy: plain(scholarship.fieldOfStudy),
+        fundingType: plain(scholarship.fundingType),
+        deadline: asIsoDate(scholarship.deadline),
         eligibility: plain(scholarship.eligibilitySummary || scholarship.eligibilityRequirements).slice(0, 600),
         baselineMatch: baselineMatchScore(scholarship.baselineMatchPercentage),
       }))
@@ -138,9 +148,14 @@ export const createRecommendationRoutes = ({ getAi }: AiRouteDependencies) =>
                 'Never invent an ID. Return only a JSON array of 3 ID strings, with no explanation.',
                 `User profile: ${JSON.stringify(profileContext)}`,
                 `Consultation answers: ${JSON.stringify(answers)}`,
-                `Candidates: ${JSON.stringify(candidates)}`,
+                `Candidates: ${JSON.stringify(candidates.map(({ id, name, country, educationLevel, fieldOfStudy, fundingType, deadline, baselineMatch }) => ({
+                  id, name, country, educationLevel, fieldOfStudy: fieldOfStudy.slice(0, 220), fundingType, deadline, baselineMatch,
+                })))}`,
               ].join('\n'),
             }],
+          }).catch((error) => {
+            if (error instanceof AppError) throw error
+            throw new AppError(502, 'RECOMMENDATION_AI_UNAVAILABLE', 'Minerva could not generate scholarship matches right now. Please try again.')
           })
           const aiIds = parseScholarshipIds(completion.text, allowed)
           const scholarshipIds = [...new Set([...aiIds, ...fallbackIds])].slice(0, 3)
