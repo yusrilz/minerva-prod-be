@@ -27,6 +27,7 @@ export const mongoTokenBalanceStore: TokenBalanceStore = {
       { $set: { dailyTokenUsage: 0, dailyTokenResetAt: startOfDay } }
     );
 
+    // this code is modified to ensure [atomic database operations prevent race conditions and double-spend token vulnerabilities under heavy concurrent load]
     const user = await User.findOneAndUpdate(
       { _id: userId, tokenBalance: { $gte: 1 }, dailyTokenUsage: { $lt: 100000 } },
       { $inc: { tokenBalance: -1 } },

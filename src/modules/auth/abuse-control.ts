@@ -10,8 +10,8 @@ const registerAttempts = new BoundedRateLimiter({
 })
 
 const loginAttempts = new BoundedRateLimiter({
-  limit: 15,
-  windowMs: 5 * 60_000,
+  limit: 5,
+  windowMs: 60_000,
   maxEntries: 10_000,
 })
 
@@ -44,6 +44,22 @@ export const enforceAuthAttemptLimit = (request: Request, operation: AuthOperati
       { retryAfterSeconds: decision.retryAfterSeconds },
     )
   }
+}
+
+export const checkLoginAttemptLimit = (request: Request, remoteAddress?: string): void => {
+  const decision = loginAttempts.check(clientKey(request, remoteAddress))
+  if (!decision.allowed) {
+    throw new AppError(
+      429,
+      'AUTH_RATE_LIMITED',
+      'Too many failed authentication attempts. Please try again shortly.',
+      { retryAfterSeconds: decision.retryAfterSeconds },
+    )
+  }
+}
+
+export const recordFailedLoginAttempt = (request: Request, remoteAddress?: string): void => {
+  loginAttempts.consume(clientKey(request, remoteAddress))
 }
 
 export const withArgon2Capacity = async <T>(operation: () => Promise<T>): Promise<T> => {

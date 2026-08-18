@@ -61,6 +61,20 @@ export class BoundedRateLimiter {
     return { allowed: true, retryAfterSeconds: 0 }
   }
 
+  check(key: string): RateLimitDecision {
+    const now = this.options.now?.() ?? Date.now()
+    const current = this.entries.get(key)
+    if (current && current.resetAt > now) {
+      if (current.count >= this.options.limit) {
+        return {
+          allowed: false,
+          retryAfterSeconds: Math.max(1, Math.ceil((current.resetAt - now) / 1_000)),
+        }
+      }
+    }
+    return { allowed: true, retryAfterSeconds: 0 }
+  }
+
   cleanup(): void {
     this.cleanupExpired(this.options.now?.() ?? Date.now(), true)
   }

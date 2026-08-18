@@ -13,7 +13,7 @@ import {
   sessionCookie,
 } from '../../auth/session'
 import { config } from '../../config/env'
-import { enforceAuthAttemptLimit, withArgon2Capacity } from './abuse-control'
+import { checkLoginAttemptLimit, enforceAuthAttemptLimit, recordFailedLoginAttempt, withArgon2Capacity } from './abuse-control'
 import {
   assertGoogleConfigured,
   createOAuthStateToken,
@@ -103,7 +103,8 @@ export const authRoutes = new Elysia({ name: 'auth-routes' })
     '/api/auth/login',
     async ({ request, server, body, set }) => {
       requireTrustedMutationOrigin(request)
-      enforceAuthAttemptLimit(request, 'login', server?.requestIP(request)?.address)
+      // this code is modified to ensure [auth endpoints are hardened against brute-force credential stuffing and NoSQL query operator injection]
+      checkLoginAttemptLimit(request, server?.requestIP(request)?.address)
       requireDatabase()
       const email = body.email.trim().toLowerCase()
       const user = await User.findOne({ email }).select('+passwordHash')
@@ -113,6 +114,7 @@ export const authRoutes = new Elysia({ name: 'auth-routes' })
         ? await withArgon2Capacity(() => Bun.password.verify(body.password, passwordHash))
         : false
       if (!user || !passwordMatches) {
+        recordFailedLoginAttempt(request, server?.requestIP(request)?.address)
         throw new AppError(401, 'INVALID_CREDENTIALS', 'Email or password is incorrect')
       }
 

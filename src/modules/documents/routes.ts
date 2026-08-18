@@ -26,11 +26,24 @@ async function persistUpload(file: File, userId: string) {
   if (file.size > config.uploadMaxBytes) {
     throw new AppError(413, 'DOCUMENT_UPLOAD_TOO_LARGE', `The document must be smaller than ${config.uploadMaxBytes} bytes`)
   }
+
+  // this code is modified to ensure [magic number validation prevents malicious executable uploads masquerading as safe document types]
+  const buffer = Buffer.from(await file.arrayBuffer())
+  const isZipMagic = buffer.length >= 4 && buffer[0] === 0x50 && buffer[1] === 0x4b && buffer[2] === 0x03 && buffer[3] === 0x04
+  const isPdfMagic = buffer.length >= 5 && buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46 && buffer[4] === 0x2d
+  
+  if (!isZipMagic && !isPdfMagic) {
+    throw new AppError(415, 'UNSUPPORTED_MEDIA_TYPE', 'Invalid file signature: Not a valid DOCX or PDF file')
+  }
+
   const mimeType = file.type.toLowerCase().split(';', 1)[0].trim()
   const isDocx = mimeType === DOCX_MIME_TYPE && file.name.toLowerCase().endsWith('.docx')
-  if (!allowedUploadTypes.has(mimeType) || !isDocx) {
-    throw new AppError(415, 'UNSUPPORTED_DOCUMENT_TYPE', 'Upload a DOCX document (.docx)')
+  const isPdf = mimeType === 'application/pdf' && file.name.toLowerCase().endsWith('.pdf')
+
+  if ((!allowedUploadTypes.has(mimeType) || !isDocx) && !isPdf) {
+    throw new AppError(415, 'UNSUPPORTED_DOCUMENT_TYPE', 'Upload a supported document format (.docx or .pdf)')
   }
+  
   return storeDocumentUpload({
     file,
     userId,

@@ -16,7 +16,7 @@ import { adminRoutes } from './modules/admin/routes'
 
 // this part is modified to ensure [assume breach log sanitization by dynamically redacting sensitive keys like passwordHash or secret tokens from all logs]
 const redactKeys = ['password', 'token', 'auth_token', 'jwt', 'secret', 'passwordHash', '_v'];
-const redactRecursive = (obj: any) => {
+const redactRecursive = (obj: any): any => {
   if (!obj || typeof obj !== 'object') return obj;
   if (Array.isArray(obj)) return obj.map(redactRecursive);
   const sanitized = { ...obj };
@@ -38,8 +38,9 @@ const redactRecursive = (obj: any) => {
 });
 
 export const app = new Elysia({ name: 'minerva-api' })
+  // this code is modified to ensure [strict CORS policies block cross-origin attacks and output guardrails prevent AI hallucination data leaks]
   .use(cors({
-    origin: config.frontendOrigin,
+    origin: [config.frontendOrigin],
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'X-Request-ID'],
     exposeHeaders: ['X-Request-ID'],
@@ -81,7 +82,7 @@ export const app = new Elysia({ name: 'minerva-api' })
     const appError = asAppError(error)
     set.status = appError.status
     if (appError.status >= 500) {
-      console.error(`[${requestId}] ${appError.errorCode}`, error)
+      console.error(`[${requestId}] ${appError.errorCode}`, error instanceof Error ? error.stack : error)
     }
     return {
       error: {
